@@ -412,9 +412,9 @@ if __name__ == "__main__":
 
         parser = ArgumentParser()
         parser.add_argument("logsFile", help="Log file to analyze.", type=str)
-        parser.add_argument("--process", help="If you want to see the graph of one process", choices=processList, type=str)
-        parser.add_argument("--compare", help="Log file from other stb to compare", type=str)
-        parser.add_argument("--compareProcess", help="If you want to paint the graph of one process with the totalFree", type=str)
+        parser.add_argument("-p", "--process", help="If you want to see the graph of one process", choices=processList, type=str)
+        parser.add_argument("-c", "--compare", help="Log file from other stb to compare", type=str)
+        parser.add_argument("-cp", "--compareProcess", help="If you want to paint the graph of one process with the totalFree", type=str)
         arguments = parser.parse_args()
 
         if (arguments.process):
