@@ -119,16 +119,16 @@ def searchProcess(process):
         if process in processList:
                 return True
 
-        print "The process available are the following:"
-        print processList
         return False
 
 
 def extracDataForProcess(process, paintGraph=True):
         filenameForExcelProcess = "format_" + process + "_" + arguments.logsFile
         filenameForExcelProcess = filenameForExcelProcess.replace('.txt', '.csv')
+        filenameForExcelProcess = filenameForExcelProcess.replace('.log', '.csv')
         filenameGraphForProcess = "graph_" + process + "_" + arguments.logsFile
         filenameGraphForProcess = filenameGraphForProcess.replace('.txt', '.html')
+        filenameGraphForProcess = filenameGraphForProcess.replace('.log', '.html')
 
         processStats = ProcessStats(process)
         header = "Time,process,pid,nThreads,IncThreads,VmSize,IncVmSize,VmRSS,IncVmRSS,VmData,IncVmData,VmLib,VmPte\n"
@@ -220,8 +220,10 @@ def extracDataForProcess(process, paintGraph=True):
 
 def totalFreeGraph(logFile, paintGraph=True):
         filenameForExcel = "format_" + logFile
+        filenameForExcel = filenameForExcel.replace('.log', '.csv')
         filenameForExcel = filenameForExcel.replace('.txt', '.csv')
         filneameForGraph = "graph_" + logFile
+        filneameForGraph = filneameForGraph.replace('.log', '.html')
         filneameForGraph = filneameForGraph.replace('.txt', '.html')
 
         search_words = ['MEMORY STATUS', "TOTAL FREE", "TOTAL Tmp"]
@@ -412,32 +414,34 @@ if __name__ == "__main__":
 
         parser = ArgumentParser()
         parser.add_argument("logsFile", help="Log file to analyze.", type=str)
-        parser.add_argument("-p", "--process", help="If you want to see the graph of one process", choices=processList, type=str)
+        parser.add_argument("-p", "--process", nargs='+', help="If you want to see the graph of one process", choices=processList, type=str)
         parser.add_argument("-c", "--compare", help="Log file from other stb to compare", type=str)
-        parser.add_argument("-cp", "--compareProcess", help="If you want to paint the graph of one process with the totalFree", type=str)
+        parser.add_argument("-cp", "--compareProcess", nargs='+', help="If you want to paint the graph of one process with the totalFree", type=str)
         arguments = parser.parse_args()
 
         if (arguments.process):
-                if (searchProcess(arguments.process)):
-                        extracDataForProcess(arguments.process, True)
-                else:
-                        print "There is no process " + arguments.process
+                for process in (arguments.process):
+                        if (searchProcess(arguments.compareProcess is not True)):
+                                print "There is no process " + process
+                        else:
+                                extracDataForProcess(process, True)
+
         elif (arguments.compare):
                 file1 = totalFreeGraph(arguments.logsFile, False)
                 file2 = totalFreeGraph(arguments.compare, False)
                 twoFilesGrapgh(file1, file2)
 
         elif (arguments.compareProcess):
-            if kk:
+                globalMemoryStats = totalFreeGraph(arguments.logsFile, False)
+                for process in (arguments.compareProcess):
+                        if (searchProcess(arguments.compareProcess is not True)):
+                                print "There is no process " + process
+                                exit(0)
 
+                        else:
+                                print "Painting graph for procces: " + process
+                                processToPaintStats = extracDataForProcess(process, False)
+                                totalFreeAndProcessGraph(globalMemoryStats, processToPaintStats)
 
-                if (searchProcess(arguments.compareProcess)):
-                        processToPaintStats = extracDataForProcess(arguments.compareProcess, False)
-                        globalMemoryStats = totalFreeGraph(arguments.logsFile, False)
-                        totalFreeAndProcessGraph(globalMemoryStats, processToPaintStats)
-
-                else:
-                        print "There is no process " + arguments.compareProcess
- 
         else:
                 totalFreeGraph(arguments.logsFile, True)
