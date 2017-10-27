@@ -413,10 +413,10 @@ if __name__ == "__main__":
         from argparse import ArgumentParser
 
         parser = ArgumentParser()
-        parser.add_argument("logsFile", help="Log file to analyze.", type=str)
-        parser.add_argument("-p", "--process", nargs='+', help="If you want to see the graph of one process", choices=processList, type=str)
-        parser.add_argument("-c", "--compare", help="Log file from other stb to compare", type=str)
-        parser.add_argument("-cp", "--compareProcess", nargs='+', help="If you want to paint the graph of one process with the totalFree", type=str)
+        parser.add_argument("logsFile", help="Logfile input. The output will be a .csv file with the memory statistics and a .html file withe the totalFree (memFree + memCached + memSwap) memory graph.", type=str)
+        parser.add_argument("-p", "--process", choices=processList, nargs='+', help='Plots the VmData consumption graph for one or some process. Allowed values are '+', '.join(processList), metavar='', type=str)
+        parser.add_argument("-cp", "--compareProcess", choices=processList, nargs='+', help='Plots the VmData consumption graph for one or some process with the totalFree (memFree + memCached + memSwap) consumption. Allowed values are '+', '.join(processList), metavar='', type=str)
+        parser.add_argument("-c", "--compare", help="Log file from other stb to compare. The output will be a .html file withe the totalFree (memFree + memCached + memSwap) memory comparation graph.", type=str)
         arguments = parser.parse_args()
 
         if (arguments.process):
