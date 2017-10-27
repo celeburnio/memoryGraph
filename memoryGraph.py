@@ -43,6 +43,9 @@ class ProcessStats:
         IncVmData = []
         VmLib = []
         VmPte = []
+        trace = {}
+        xaxis = {}
+        yaxis = {}
 
         def __init__(self, process):
                 self.name = process
@@ -58,6 +61,9 @@ class ProcessStats:
                 self.IncVmData = []
                 self.VmLib = []
                 self.VmPte = []
+                self.trace = {}
+                self.xaxis = {}
+                self.yaxis = {}
 
 
 class GlobalMemoryStats:
@@ -179,38 +185,40 @@ def extracDataForProcess(process, paintGraph=True):
 
         os.remove('aux_process.txt')
 
+        processStats.trace = {
+                "x": processStats.timestamp,
+                "y": processStats.VmData,
+                "mode": "lines",
+                "name": "Process Memory",
+                "text": processStats.VmData,
+                "type": "scatter"
+        }
+        processStats.xaxis = {
+                "autorange": True,
+                "range": [0, len(processStats.timestamp)],
+                "title": "Time",
+                "type": "category",
+                "tickangle": 330
+        }
+        processStats.yaxis = {
+                "autorange": True,
+                "range": [min(processStats.VmData), max(processStats.VmData)],
+                "title": "VmData",
+                "type": "liner"
+        }
+
         if paintGraph is True:
                 plotTitle = process + " process VmData"
 
-                trace1 = {
-                        "x": processStats.timestamp,
-                        "y": processStats.VmData,
-                        "mode": "lines",
-                        "name": "Process Memory",
-                        "text": processStats.VmData,
-                        "type": "scatter"
-                }
-
-                data = Data([trace1])
+                data = Data([processStats.trace])
 
                 layout = {
                         "autosize": True,
                         "dragmode": "zoom",
                         "hovermode": "closest",
                         "title": plotTitle,
-                        "xaxis": {
-                                "autorange": True,
-                                "range": [0, len(processStats.timestamp)],
-                                "title": "Time",
-                                "type": "category",
-                                "tickangle": 330
-                        },
-                        "yaxis": {
-                                "autorange": True,
-                                "range": [min(processStats.VmData), max(processStats.VmData)],
-                                "title": "VmData",
-                                "type": "liner"
-                        }
+                        "xaxis": processStats.xaxis,
+                        "yaxis": processStats.yaxis
                 }
                 fig = Figure(data=data, layout=layout)
                 plotly.offline.plot(fig, filename=filenameGraphForProcess)
@@ -360,29 +368,28 @@ def twoFilesGrapgh(file1, file2):
         plotly.offline.plot(fig, filename="twoFilesComparation.html")
 
 
-def totalFreeAndProcessGraph(globalMemoryStats, processToPaintStats):
-        trace1 = {
+def totalFreeAndProcessGraph(globalMemoryStats, processTracesList):
+        tracesList = []
+        traceTotalFree = {
                 "x": globalMemoryStats.timestamp,
                 "y": globalMemoryStats.totalFree,
                 "mode": "lines",
                 "name": globalMemoryStats.name,
                 "type": "scatter",
         }
-        trace2 = {
-                "x": processToPaintStats.timestamp,
-                "y": processToPaintStats.VmData,
-                "mode": "lines",
-                "name": processToPaintStats.name,
-                "type": "scatter",
-                "yaxis": "y2"
-        }
-        data = Data([trace1, trace2])
+        tracesList.append(traceTotalFree)
+        #data = Data([trace1, trace2])
+
+        for traces in processTracesList:
+                tracesList.append(traces)
+
+        data = Data(tracesList)
 
         layout = {
                 "title": "TotelFree memory comparation",
                 "xaxis": {
                         "autorange": True,
-                        "range": [0, len(max(globalMemoryStats.timestamp, processToPaintStats.timestamp))],
+                        "range": [0, globalMemoryStats.timestamp],
                         "title": "Time",
                         "type": "category",
                         "tickangle": 330
@@ -393,19 +400,11 @@ def totalFreeAndProcessGraph(globalMemoryStats, processToPaintStats):
                         "side": "left",
                         "title": "TotalFree",
                         "type": "liner"
-                },
-                "yaxis2": {
-                        "autorange": True,
-                        "range": [min(processToPaintStats.VmData), max(processToPaintStats.VmData)],
-                        "title": processToPaintStats.name + " VmData",
-                        "overlaying": 'y',
-                        "side": "right",
-                        "type": "liner"
                 }
- 
         }
+
         fig = Figure(data=data, layout=layout)
-        filenameForGraph=globalMemoryStats.name + "_Vs_" + processToPaintStats.name + ".html"
+        filenameForGraph=globalMemoryStats.name + "_Vs_" + "processes" + ".html"
         plotly.offline.plot(fig, filename=filenameForGraph)
 
 
@@ -434,14 +433,17 @@ if __name__ == "__main__":
         elif (arguments.compareProcess):
                 globalMemoryStats = totalFreeGraph(arguments.logsFile, False)
                 for process in (arguments.compareProcess):
+                        processTracesList = []
                         if (searchProcess(arguments.compareProcess is not True)):
                                 print "There is no process " + process
                                 exit(0)
 
                         else:
                                 print "Painting graph for procces: " + process
-                                processToPaintStats = extracDataForProcess(process, False)
-                                totalFreeAndProcessGraph(globalMemoryStats, processToPaintStats)
+                                processStats = extracDataForProcess(process, False)
+                                processTracesList.append(processStats.trace)
+
+                totalFreeAndProcessGraph(globalMemoryStats, processTracesList)
 
         else:
                 totalFreeGraph(arguments.logsFile, True)
