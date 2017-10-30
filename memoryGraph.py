@@ -128,13 +128,10 @@ def searchProcess(process):
         return False
 
 
-def extracDataForProcess(process, paintGraph=True):
+def extracDataForProcess(process):
         filenameForExcelProcess = "format_" + process + "_" + arguments.logsFile
         filenameForExcelProcess = filenameForExcelProcess.replace('.txt', '.csv')
         filenameForExcelProcess = filenameForExcelProcess.replace('.log', '.csv')
-        filenameGraphForProcess = "graph_" + process + "_" + arguments.logsFile
-        filenameGraphForProcess = filenameGraphForProcess.replace('.txt', '.html')
-        filenameGraphForProcess = filenameGraphForProcess.replace('.log', '.html')
 
         processStats = ProcessStats(process)
         header = "Time,process,pid,nThreads,IncThreads,VmSize,IncVmSize,VmRSS,IncVmRSS,VmData,IncVmData,VmLib,VmPte\n"
@@ -189,9 +186,12 @@ def extracDataForProcess(process, paintGraph=True):
                 "x": processStats.timestamp,
                 "y": processStats.VmData,
                 "mode": "lines",
-                "name": "Process Memory",
+                "name": (processStats.name + " VmdData Memory"),
                 "text": processStats.VmData,
-                "type": "scatter"
+                "type": "scatter",
+                "min_VmData": min(processStats.VmData),
+                "max_VmData": max(processStats.VmData),
+                "len_timestamp": len(processStats.timestamp)
         }
         processStats.xaxis = {
                 "autorange": True,
@@ -206,24 +206,48 @@ def extracDataForProcess(process, paintGraph=True):
                 "title": "VmData",
                 "type": "liner"
         }
+        return processStats
 
-        if paintGraph is True:
-                plotTitle = process + " process VmData"
+def paintProcessGraph(processList):
+        filenameGraphForProcess = "graph_process_" + arguments.logsFile
+        filenameGraphForProcess = filenameGraphForProcess.replace('.txt', '.html')
+        filenameGraphForProcess = filenameGraphForProcess.replace('.log', '.html')
+        tracesList = []
+        max_VmDataValues = []
+        min_VmDataValues = []
+        len_timestampValues = []
+        for traces in processTracesList:
+                tracesList.append(traces)
+                max_VmDataValues.append(traces["max_VmData"])
+                min_VmDataValues.append(traces["min_VmData"])
+                len_timestampValues.append(traces["len_timestamp"])
+                traces.pop("max_VmData",None)
+                traces.pop("min_VmData",None)
+                traces.pop("len_timestamp",None)
 
-                data = Data([processStats.trace])
+        data = Data(tracesList)
 
-                layout = {
-                        "autosize": True,
-                        "dragmode": "zoom",
-                        "hovermode": "closest",
-                        "title": plotTitle,
-                        "xaxis": processStats.xaxis,
-                        "yaxis": processStats.yaxis
+        layout = {
+                "autosize": True,
+                "dragmode": "zoom",
+                "hovermode": "closest",
+                "xaxis": {
+                        "autorange": True,
+                        "range": [0, max(len_timestampValues)],
+                        "title": "Time",
+                        "type": "category",
+                        "tickangle": 330
+                },
+                "yaxis": {
+                        "autorange": True,
+                        "range": [min(min_VmDataValues), max(max_VmDataValues)],
+                        "side": "left",
+                        "title": "TotalFree",
+                        "type": "liner"
                 }
-                fig = Figure(data=data, layout=layout)
-                plotly.offline.plot(fig, filename=filenameGraphForProcess)
-        else:
-                return processStats
+        }
+        fig = Figure(data=data, layout=layout)
+        plotly.offline.plot(fig, filename=filenameGraphForProcess)
 
 
 def totalFreeGraph(logFile, paintGraph=True):
@@ -378,10 +402,18 @@ def totalFreeAndProcessGraph(globalMemoryStats, processTracesList):
                 "type": "scatter",
         }
         tracesList.append(traceTotalFree)
-        #data = Data([trace1, trace2])
 
+        max_VmDataValues = []
+        min_VmDataValues = []
+        len_timestampValues = []
         for traces in processTracesList:
                 tracesList.append(traces)
+                max_VmDataValues.append(traces["max_VmData"])
+                min_VmDataValues.append(traces["min_VmData"])
+                len_timestampValues.append(traces["len_timestamp"])
+                traces.pop("max_VmData",None)
+                traces.pop("min_VmData",None)
+                traces.pop("len_timestamp",None)
 
         data = Data(tracesList)
 
@@ -396,7 +428,7 @@ def totalFreeAndProcessGraph(globalMemoryStats, processTracesList):
                 },
                 "yaxis": {
                         "autorange": True,
-                        "range": [min(globalMemoryStats.totalFree), max(globalMemoryStats.totalFree)],
+                        "range": [min(globalMemoryStats.totalFree, min(min_VmDataValues)), max(globalMemoryStats.totalFree, max(max_VmDataValues))],
                         "side": "left",
                         "title": "TotalFree",
                         "type": "liner"
@@ -419,11 +451,18 @@ if __name__ == "__main__":
         arguments = parser.parse_args()
 
         if (arguments.process):
+                processTracesList = []
                 for process in (arguments.process):
                         if (searchProcess(arguments.compareProcess is not True)):
                                 print "There is no process " + process
+                                exit(0)
                         else:
-                                extracDataForProcess(process, True)
+                                print "Painting graph for procces: " + process
+                                processStats = extracDataForProcess(process)
+                                processTracesList.append(processStats.trace)
+                
+                paintProcessGraph(processTracesList)
+
 
         elif (arguments.compare):
                 file1 = totalFreeGraph(arguments.logsFile, False)
@@ -432,15 +471,14 @@ if __name__ == "__main__":
 
         elif (arguments.compareProcess):
                 globalMemoryStats = totalFreeGraph(arguments.logsFile, False)
+                processTracesList = []
                 for process in (arguments.compareProcess):
-                        processTracesList = []
                         if (searchProcess(arguments.compareProcess is not True)):
                                 print "There is no process " + process
                                 exit(0)
-
                         else:
                                 print "Painting graph for procces: " + process
-                                processStats = extracDataForProcess(process, False)
+                                processStats = extracDataForProcess(process)
                                 processTracesList.append(processStats.trace)
 
                 totalFreeAndProcessGraph(globalMemoryStats, processTracesList)
