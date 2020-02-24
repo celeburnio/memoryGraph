@@ -3,26 +3,30 @@
 
 import os
 import plotly
-from plotly.graph_objs import *
+import  plotly.graph_objects as go
 
 processList = []
-processList.append("tniISManager")
-processList.append("networkManager")
-processList.append("tniListenerKey")
-processList.append("tniMediaPlayer")
-processList.append("httpproxy")
-processList.append("profileManager")
-processList.append("bwManager")
-processList.append("epgManager")
-processList.append("cdvrManager")
-processList.append("patchManager")
-processList.append("audiences")
-processList.append("drmManager")
-processList.append("qualityMeasure")
-processList.append("infopush_clien")
-processList.append("friendlyReset")
-processList.append("tr69")
-processList.append("WidgetManager")
+processList.append("opchd")
+processList.append("dvbipid")
+processList.append("wyntpd")
+processList.append("wystandby")
+processList.append("storaged")
+processList.append("wynetworkd")
+processList.append("platformd")
+processList.append("wyplayer")
+processList.append("uwsgi")
+processList.append("cds-pvr-daemon")
+processList.append("srsd")
+processList.append("nagra_server")
+processList.append("nxserver")
+processList.append("input_modules")
+processList.append("TlfKeyManager")
+processList.append("dialserver")
+processList.append("mdnsd")
+processList.append("multiroomd")
+processList.append("portal-vivo-qm")
+processList.append("GIBBON_MAIN")
+
 
 #####################
 # class definitions #
@@ -50,9 +54,12 @@ class ProcessStats:
         def __init__(self, process):
                 self.name = process
                 self.pid = 0
+                self.deads = []
                 self.timestamp = []
                 self.nThreads = []
                 self.IncThreads = []
+                self.fds = []
+                self.IncFds = []
                 self.VmSize = []
                 self.IncVmSize = []
                 self.VmRSS = []
@@ -82,6 +89,8 @@ class GlobalMemoryStats:
                 self.cached = []
                 self.swap = []
                 self.tmp = []
+                self.cmaTotal = []
+                self.cmaFree = []
 
 ##############################
 # functions to proccess text #
@@ -134,9 +143,9 @@ def extracDataForProcess(process):
         filenameForExcelProcess = filenameForExcelProcess.replace('.log', '.csv')
 
         processStats = ProcessStats(process)
-        header = "Time,process,pid,nThreads,IncThreads,VmSize,IncVmSize,VmRSS,IncVmRSS,VmData,IncVmData,VmLib,VmPte\n"
+        header = "Time,process,pid,deads,nThreads,IncThreads,fds,IncFds,VmSize,IncVmSize,VmRSS,IncVmRSS,VmData,IncVmData,VmLib,VmPte\n"
 
-        search_words = ['MEMORY STATUS', (process + "  ")]
+        search_words = ['MEMORY FOOTPRINT -', (process + "  ")]
         with open(arguments.logsFile) as oldfile, open('aux_process.txt', 'w') as newfile:
                 for line in oldfile:
                         if any(word in line for word in search_words):
@@ -150,10 +159,10 @@ def extracDataForProcess(process):
         excelfileForProcess = open(filenameForExcelProcess, 'w')
         excelfileForProcess.write(header)
         for line in newfile:
-                if (line.count('MEMORY STATUS') == 1):
+                if (line.count('MEMORY FOOTPRINT -') == 1):
                         aux = line.replace('=', '')
                         aux = aux.replace(',', '')
-                        aux = aux.replace('MEMORY STATUS:', '')
+                        aux = aux.replace('MEMORY FOOTPRINT -:', '')
                         aux = aux.replace('#', '')
                         aux = aux.replace('\n', '')
                         aux = aux.lstrip()
@@ -161,21 +170,24 @@ def extracDataForProcess(process):
                         excelfileForProcess.write(aux + ',')
                         processStats.timestamp.append(aux)
                         continue
-                excelfileForProcess.write(formatLine(line))
+                excelfileForProcess.write(formatLine(line) + '\n')
                 aux = formatLine(line)
                 array_aux = []
                 array_aux = aux.split(',')
                 processStats.pid = array_aux[1]
-                processStats.nThreads.append(array_aux[2])
-                processStats.IncThreads.append(array_aux[3])
-                processStats.VmSize.append(array_aux[4])
-                processStats.IncVmSize.append(array_aux[5])
-                processStats.VmRSS.append(array_aux[6])
-                processStats.IncVmSize.append(array_aux[7])
-                processStats.VmData.append(array_aux[8])
-                processStats.IncVmData.append(array_aux[9])
-                processStats.VmLib.append(array_aux[10])
-                processStats.VmPte.append(array_aux[11])
+                processStats.deads = array_aux[2]
+                processStats.nThreads.append(array_aux[3])
+                processStats.IncThreads.append(array_aux[4])
+                processStats.fds.append(array_aux[5])
+                processStats.IncFds.append(array_aux[6])
+                processStats.VmSize.append(array_aux[7])
+                processStats.IncVmSize.append(array_aux[8])
+                processStats.VmRSS.append(array_aux[9])
+                processStats.IncVmSize.append(array_aux[10])
+                processStats.VmData.append(array_aux[11])
+                processStats.IncVmData.append(array_aux[12])
+                processStats.VmLib.append(array_aux[13])
+                processStats.VmPte.append(array_aux[14])
 
         excelfileForProcess.close()
         newfile.close()
@@ -216,6 +228,7 @@ def paintProcessGraph(processList):
         max_VmDataValues = []
         min_VmDataValues = []
         len_timestampValues = []
+        fig = go.Figure()
         for traces in processTracesList:
                 tracesList.append(traces)
                 max_VmDataValues.append(traces["max_VmData"])
@@ -224,29 +237,21 @@ def paintProcessGraph(processList):
                 traces.pop("max_VmData",None)
                 traces.pop("min_VmData",None)
                 traces.pop("len_timestamp",None)
+        # processStats.trace = {
+        #         "x": processStats.timestamp,
+        #         "y": processStats.VmData,
+        #         "mode": "lines",
+        #         "name": (processStats.name + " VmdData Memory"),
+        #         "text": processStats.VmData,
+        #         "type": "scatter",
+        #         "min_VmData": min(processStats.VmData),
+        #         "max_VmData": max(processStats.VmData),
+        #         "len_timestamp": len(processStats.timestamp)
+        # }
+                fig.add_trace(go.Scatter(x=traces["x"], y=traces["y"],
+                                mode='lines',
+                                name=traces["name"]))
 
-        data = Data(tracesList)
-
-        layout = {
-                "autosize": True,
-                "dragmode": "zoom",
-                "hovermode": "closest",
-                "xaxis": {
-                        "autorange": True,
-                        "range": [0, max(len_timestampValues)],
-                        "title": "Time",
-                        "type": "category",
-                        "tickangle": 330
-                },
-                "yaxis": {
-                        "autorange": True,
-                        "range": [min(min_VmDataValues), max(max_VmDataValues)],
-                        "side": "left",
-                        "title": "TotalFree",
-                        "type": "liner"
-                }
-        }
-        fig = Figure(data=data, layout=layout)
         plotly.offline.plot(fig, filename=filenameGraphForProcess)
 
 
@@ -258,7 +263,7 @@ def totalFreeGraph(logFile, paintGraph=True):
         filneameForGraph = filneameForGraph.replace('.log', '.html')
         filneameForGraph = filneameForGraph.replace('.txt', '.html')
 
-        search_words = ['MEMORY STATUS', "TOTAL FREE", "TOTAL Tmp"]
+        search_words = ['MEMORY FOOTPRINT', "Available", "/tmp Size"]
         with open(logFile) as oldfile, open('aux_totalMemory.txt', 'w') as newfile:
                 for line in oldfile:
                         if any(word in line for word in search_words):
@@ -269,7 +274,7 @@ def totalFreeGraph(logFile, paintGraph=True):
 
         logsFile = open('aux_totalMemory.txt', 'r')
         excelFile = open(filenameForExcel, 'w')
-        excelFile.write("Time,TotalFree,Free,Cached,Swap,Tmp\n")
+        excelFile.write("Time,TotalFree,Free,Cached,Swap,cmaTotal,cmaFree\n")
         # ================== MEMORY STATUS: 2016/10/28 16:38:28 =========================================
         # TOTAL FREE:             705656, Free:           592956, Cached:                 112700, Swap:                    0
         # TOTAL Tmp Size: 13668 KB
@@ -277,8 +282,8 @@ def totalFreeGraph(logFile, paintGraph=True):
         for line in logsFile:
                 aux = line.replace('=', '')
                 aux = aux.replace(',', '')
-                if (aux.count('MEMORY STATUS') == 1):
-                        aux = aux.replace('MEMORY STATUS:', '')
+                if (aux.count('MEMORY FOOTPRINT') == 1):
+                        aux = aux.replace('MEMORY FOOTPRINT -', '')
                         aux = aux.replace('#', '')
                         aux = aux.replace('\n', '')
                         aux = aux.lstrip()
@@ -286,24 +291,28 @@ def totalFreeGraph(logFile, paintGraph=True):
                         excelFile.write(aux + ',')
                         globalMemoryStats.timestamp.append(aux)
                         continue
-                if (aux.count('TOTAL FREE') == 1):
+                if (aux.count('Available') == 1):
                         aux = aux.replace(':', '')
-                        aux = aux.replace('TOTAL FREE', '')
+                        aux = aux.replace('Available', '')
                         aux = aux.replace('Free', '')
                         aux = aux.replace('Cached', '')
                         aux = aux.replace('Swap', '')
+                        aux = aux.replace('cmaTotal', '')
+                        aux = aux.replace('cmaFree', '')
                         aux = aux.replace('\n', '')
-                        excelFile.write(formatLine(aux) + ',')
+                        excelFile.write(formatLine(aux) + ',' + '\n')
                         aux = formatLine(aux)
                         array_aux = aux.split(',')
                         globalMemoryStats.totalFree.append(array_aux[0])
                         globalMemoryStats.free.append(array_aux[1])
                         globalMemoryStats.cached.append(array_aux[2])
                         globalMemoryStats.swap.append(array_aux[3])
+                        globalMemoryStats.cmaTotal.append(array_aux[4])
+                        globalMemoryStats.cmaFree.append(array_aux[5])
                         continue
-                if (aux.count('TOTAL Tmp Size') == 1):
+                if (aux.count('/tmp Size') == 1):
                         aux = aux.replace(':', '')
-                        aux = aux.replace('TOTAL Tmp Size', '')
+                        aux = aux.replace('/tmp Size', '')
                         aux = aux.replace('KB', '')
                         excelFile.write(formatLine(aux))
                         globalMemoryStats.tmp.append(aux)
@@ -313,39 +322,28 @@ def totalFreeGraph(logFile, paintGraph=True):
         logsFile.close()
         os.remove('aux_totalMemory.txt')
 
+        
+
         if paintGraph is True:
-                trace1 = {
-                        "x": globalMemoryStats.timestamp,
-                        "y": globalMemoryStats.totalFree,
-                        "mode": "lines",
-                        "name": "TotalFree",
-                        "text": globalMemoryStats.totalFree,
-                        "type": "scatter",
-                }
-
-                data = Data([trace1])
-
-                layout = {
-                        "autosize": True,
-                        "dragmode": "zoom",
-                        "hovermode": "closest",
-                        "title": "TotelFree memory",
-                        "xaxis": {
-                                "autorange": True,
-                                "range": [0, len(globalMemoryStats.timestamp)],
-                                "title": "Time",
-                                "type": "category",
-                                "tickangle": 330
-                        },
-                        "yaxis": {
-                                "autorange": True,
-                                "range": [min(globalMemoryStats.totalFree), max(globalMemoryStats.totalFree)],
-                                "title": "TotalFree",
-                                "type": "liner"
-                        }
-                }
-                fig = Figure(data=data, layout=layout)
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=globalMemoryStats.timestamp, y=globalMemoryStats.free,
+                                mode='lines',
+                                name='free'))
+                fig.add_trace(go.Scatter(x=globalMemoryStats.timestamp, y=globalMemoryStats.totalFree,
+                                mode='lines',
+                                name='totalFree'))
+                fig.add_trace(go.Scatter(x=globalMemoryStats.timestamp, y=globalMemoryStats.cached,
+                                mode='lines', name='cached'))
+                fig.add_trace(go.Scatter(x=globalMemoryStats.timestamp, y=globalMemoryStats.swap,
+                                mode='lines', name='swap'))
+                fig.add_trace(go.Scatter(x=globalMemoryStats.timestamp, y=globalMemoryStats.cmaTotal,
+                                mode='lines', name='cmaTotal'))
+                fig.add_trace(go.Scatter(x=globalMemoryStats.timestamp, y=globalMemoryStats.cmaFree,
+                                mode='lines', name='cmaFree'))
+                fig.add_trace(go.Scatter(x=globalMemoryStats.timestamp, y=globalMemoryStats.tmp,
+                                mode='lines', name='tmp'))
                 plotly.offline.plot(fig, filename=filneameForGraph)
+        
         else:
                 return globalMemoryStats
 
@@ -454,10 +452,10 @@ if __name__ == "__main__":
                 processTracesList = []
                 for process in (arguments.process):
                         if (searchProcess(arguments.compareProcess is not True)):
-                                print "There is no process " + process
+                                print ("There is no process " + process)
                                 exit(0)
                         else:
-                                print "Painting graph for procces: " + process
+                                print ("Painting graph for procces: " + process)
                                 processStats = extracDataForProcess(process)
                                 processTracesList.append(processStats.trace)
                 
@@ -474,10 +472,10 @@ if __name__ == "__main__":
                 processTracesList = []
                 for process in (arguments.compareProcess):
                         if (searchProcess(arguments.compareProcess is not True)):
-                                print "There is no process " + process
+                                print ("There is no process " + process)
                                 exit(0)
                         else:
-                                print "Painting graph for procces: " + process
+                                print ("Painting graph for procces: " + process)
                                 processStats = extracDataForProcess(process)
                                 processTracesList.append(processStats.trace)
 
